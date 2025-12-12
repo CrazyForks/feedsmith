@@ -19,7 +19,6 @@ import {
   generateXml,
   generateXmlStylesheet,
   generateYesNoBoolean,
-  hasEntities,
   isNonEmptyString,
   isNonEmptyStringOrNumber,
   isObject,
@@ -38,7 +37,6 @@ import {
   parseYesNoBoolean,
   retrieveRdfResourceOrText,
   retrieveText,
-  stripCdata,
   trimArray,
   trimObject,
 } from './utils.js'
@@ -390,38 +388,20 @@ describe('retrieveRdfResourceOrText', () => {
       expect(retrieveRdfResourceOrText(value, parseString)).toBe(expected)
     })
 
-    it('should handle HTML entities in @rdf:resource', () => {
+    it('should handle URL with query parameters in @rdf:resource', () => {
       const value = {
-        '@rdf:resource': 'https://example.com?foo=bar&amp;baz=qux',
+        '@rdf:resource': 'https://example.com?foo=bar&baz=qux',
       }
       const expected = 'https://example.com?foo=bar&baz=qux'
 
       expect(retrieveRdfResourceOrText(value, parseString)).toBe(expected)
     })
 
-    it('should handle HTML entities in #text', () => {
+    it('should handle URL with query parameters in #text', () => {
       const value = {
-        '#text': 'https://example.com?foo=bar&amp;baz=qux',
+        '#text': 'https://example.com?foo=bar&baz=qux',
       }
       const expected = 'https://example.com?foo=bar&baz=qux'
-
-      expect(retrieveRdfResourceOrText(value, parseString)).toBe(expected)
-    })
-
-    it('should handle CDATA sections in @rdf:resource', () => {
-      const value = {
-        '@rdf:resource': '<![CDATA[https://creativecommons.org/licenses/by/4.0/]]>',
-      }
-      const expected = 'https://creativecommons.org/licenses/by/4.0/'
-
-      expect(retrieveRdfResourceOrText(value, parseString)).toBe(expected)
-    })
-
-    it('should handle CDATA sections in #text', () => {
-      const value = {
-        '#text': '<![CDATA[https://creativecommons.org/licenses/by/4.0/]]>',
-      }
-      const expected = 'https://creativecommons.org/licenses/by/4.0/'
 
       expect(retrieveRdfResourceOrText(value, parseString)).toBe(expected)
     })
@@ -742,148 +722,6 @@ describe('trimArray', () => {
   })
 })
 
-describe('stripCdata', () => {
-  it('should return string without CDATA markers when present', () => {
-    expect(stripCdata('<![CDATA[content]]>')).toBe('content')
-    expect(stripCdata('prefix<![CDATA[content]]>suffix')).toBe('prefixcontentsuffix')
-    expect(stripCdata('<![CDATA[]]>')).toBe('')
-  })
-
-  it('should handle multiple CDATA sections in a single string', () => {
-    expect(stripCdata('<![CDATA[first]]>middle<![CDATA[second]]>')).toBe('firstmiddlesecond')
-    expect(stripCdata('start<![CDATA[one]]>between<![CDATA[two]]>end')).toEqual(
-      'startonebetweentwoend',
-    )
-    expect(stripCdata('<![CDATA[a]]><![CDATA[b]]><![CDATA[c]]>')).toBe('abc')
-  })
-
-  it('should return the original string when no CDATA markers are present', () => {
-    expect(stripCdata('regular text')).toBe('regular text')
-    expect(stripCdata('')).toBe('')
-    expect(stripCdata('text with <tags> but no CDATA')).toBe('text with <tags> but no CDATA')
-  })
-
-  it('should handle CDATA with special XML characters', () => {
-    expect(stripCdata('<![CDATA[<div>HTML content</div>]]>')).toBe('<div>HTML content</div>')
-    expect(stripCdata('<![CDATA[&lt;p&gt;encoded entities&lt;/p&gt;]]>')).toEqual(
-      '&lt;p&gt;encoded entities&lt;/p&gt;',
-    )
-    expect(stripCdata('<![CDATA[5 < 10 && 10 > 5]]>')).toBe('5 < 10 && 10 > 5')
-  })
-
-  it('should handle CDATA with newlines and whitespace', () => {
-    expect(stripCdata('<![CDATA[\n  multiline\n  content\n]]>')).toEqual(
-      '\n  multiline\n  content\n',
-    )
-    expect(stripCdata('<![CDATA[   space   ]]>')).toBe('   space   ')
-    expect(stripCdata('  <![CDATA[trimming]]>  ')).toBe('  trimming  ')
-  })
-
-  it('should handle malformed or partial CDATA properly', () => {
-    expect(stripCdata('Incomplete <![CDATA[content')).toBe('Incomplete <![CDATA[content')
-    expect(stripCdata('Missing end content]]>')).toBe('Missing end content]]>')
-    expect(stripCdata('<![CDATA[nested <![CDATA[content]]>]]>')).toEqual(
-      'nested <![CDATA[content]]>',
-    )
-  })
-
-  it('should handle case-sensitivity properly', () => {
-    expect(stripCdata('<![cdata[lowercase]]>')).toBe('<![cdata[lowercase]]>')
-    expect(stripCdata('<![CDATA[correct case]]>')).toBe('correct case')
-  })
-
-  it('should handle empty values correctly', () => {
-    expect(stripCdata('')).toBe('')
-    expect(stripCdata('   ')).toBe('   ')
-  })
-
-  it('should return the same value for non-string inputs', () => {
-    expect(stripCdata(null)).toBeNull()
-    expect(stripCdata(undefined)).toBeUndefined()
-    expect(stripCdata(123)).toEqual(123)
-    expect(stripCdata(true)).toBe(true)
-    expect(stripCdata(false)).toBe(false)
-    expect(stripCdata([])).toEqual([])
-    expect(stripCdata({})).toEqual({})
-    expect(stripCdata(() => {})).toBeTypeOf('function')
-  })
-})
-
-describe('hasEntities', () => {
-  it('should detect basic HTML entities', () => {
-    expect(hasEntities('This contains &lt;')).toBe(true)
-    expect(hasEntities('This contains &gt;')).toBe(true)
-    expect(hasEntities('This contains &amp;')).toBe(true)
-    expect(hasEntities('This contains &quot;')).toBe(true)
-    expect(hasEntities('This contains &apos;')).toBe(true)
-  })
-
-  it('should detect named HTML entities', () => {
-    expect(hasEntities('This contains &copy;')).toBe(true)
-    expect(hasEntities('This contains &reg;')).toBe(true)
-    expect(hasEntities('This contains &euro;')).toBe(true)
-    expect(hasEntities('This contains &trade;')).toBe(true)
-    expect(hasEntities('This contains &nbsp;')).toBe(true)
-  })
-
-  it('should detect numeric HTML entities', () => {
-    expect(hasEntities('This contains &#169;')).toBe(true)
-    expect(hasEntities('This contains &#8364;')).toBe(true)
-    expect(hasEntities('This contains &#x00A9;')).toBe(true)
-    expect(hasEntities('This contains &#x20AC;')).toBe(true)
-  })
-
-  it('should detect multiple entities in the same string', () => {
-    expect(hasEntities('This &lt;tag&gt; has multiple &amp; entities')).toBe(true)
-    expect(hasEntities('Copyright &copy; 2023, &reg; trademark')).toBe(true)
-  })
-
-  it('should detect entities in different positions', () => {
-    expect(hasEntities('&lt;p&gt;At the beginning')).toBe(true)
-    expect(hasEntities('In the middle &amp; of the string')).toBe(true)
-    expect(hasEntities('At the end &gt;')).toBe(true)
-  })
-
-  it('should detect nested entities', () => {
-    expect(hasEntities('This contains &amp;lt;')).toBe(true)
-    expect(hasEntities('Complex &amp;amp; nested entities')).toBe(true)
-  })
-
-  it('should detect XML entities', () => {
-    expect(hasEntities('<tag attribute="&apos;value&apos;">')).toBe(true)
-    expect(hasEntities('<![CDATA[content with &lt; entity]]>')).toBe(true)
-  })
-
-  it('should return false when no entities are present', () => {
-    expect(hasEntities('This string has no entities')).toBe(false)
-    expect(hasEntities('Plain <tag> without entities')).toBe(false)
-    expect(hasEntities('Regular & ampersand')).toBe(false)
-    expect(hasEntities('Symbol ; semicolon')).toBe(false)
-  })
-
-  it('should handle strings with ampersand but no semicolon', () => {
-    expect(hasEntities('This & that')).toBe(false)
-    expect(hasEntities('Company & Co.')).toBe(false)
-    expect(hasEntities('A&B Corporation')).toBe(false)
-  })
-
-  it('should handle strings with semicolon but no ampersand', () => {
-    expect(hasEntities('This; that')).toBe(false)
-    expect(hasEntities('List: item1; item2; item3')).toBe(false)
-  })
-
-  it('should return false for unusual cases', () => {
-    expect(hasEntities('& amp;')).toBe(true)
-    expect(hasEntities('&amp')).toBe(false)
-    expect(hasEntities('')).toBe(false)
-  })
-
-  it('should handle cases that might produce false positives', () => {
-    expect(hasEntities('Fish & Chips; best in town')).toBe(true)
-    expect(hasEntities('Salt & pepper; sugar & spice')).toBe(true)
-  })
-})
-
 describe('parseString', () => {
   it('should handle non-empty string', () => {
     const value = 'javascript'
@@ -891,95 +729,12 @@ describe('parseString', () => {
     expect(parseString(value)).toEqual(value)
   })
 
-  it('Should handle entities #1', () => {
-    const value =
-      'Testing &lt;b&gt;bold text&lt;/b&gt; and &lt;i&gt;italic text&lt;/i&gt; with &amp;amp; ampersand, &amp;quot; quotes, &amp;apos; apostrophe and &amp;nbsp; non-breaking space.'
-    const expected = `Testing <b>bold text</b> and <i>italic text</i> with & ampersand, " quotes, ' apostrophe and   non-breaking space.`
-    expect(parseString(value)).toBe(expected)
+  it('should trim whitespace from string', () => {
+    expect(parseString('  hello  ')).toBe('hello')
+    expect(parseString('\n\ttest\n\t')).toBe('test')
   })
 
-  it('Should handle entities #2', () => {
-    const value =
-      '<![CDATA[Testing <b>bold text</b> and <i>italic text</i> with &amp; ampersand, &quot; quotes, &apos; apostrophe and &nbsp; non-breaking space.]]>'
-    const expected = `Testing <b>bold text</b> and <i>italic text</i> with & ampersand, " quotes, ' apostrophe and   non-breaking space.`
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #3', () => {
-    const value =
-      'Special chars: &amp;lt; &amp;gt; &amp;euro; € &amp;copy; © &amp;reg; ® &amp;pound; £ &amp;yen; ¥'
-    const expected = 'Special chars: < > € € © © ® ® £ £ ¥ ¥'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #4', () => {
-    const value = '<![CDATA[Special chars: &lt; &gt; &euro; € &copy; © &reg; ® &pound; £ &yen; ¥]]>'
-    const expected = 'Special chars: < > € € © © ® ® £ £ ¥ ¥'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #5', () => {
-    const value =
-      'Numeric entities: &amp;#169; &#169; &amp;#8364; &#8364; &amp;#8482; &#8482; &amp;#x2122; &#x2122;'
-    const expected = 'Numeric entities: © © € € ™ ™ ™ ™'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #6', () => {
-    const value = '<![CDATA[Numeric entities: &#169; &#8364; &#8482; &#x2122;]]>'
-    const expected = 'Numeric entities: © € ™ ™'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #7', () => {
-    const value =
-      '&lt;p&gt;HTML mixed with entities: &amp;copy; ©, &amp;reg; ®, &amp;#8364; € and &lt;a href=&quot;https://example.com?param1=value1&amp;param2=value2&quot;&gt;URL with ampersand&lt;/a&gt;&lt;/p&gt;'
-    const expected =
-      '<p>HTML mixed with entities: © ©, ® ®, € € and <a href="https://example.com?param1=value1¶m2=value2">URL with ampersand</a></p>'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #8', () => {
-    const value =
-      '<![CDATA[<p>HTML mixed with entities: &copy; ©, &reg; ®, &#8364; € and <a href="https://example.com?param1=value1&param2=value2">URL with ampersand</a></p>]]>'
-    const expected =
-      '<p>HTML mixed with entities: © ©, ® ®, € € and <a href="https://example.com?param1=value1¶m2=value2">URL with ampersand</a></p>'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #9', () => {
-    const value =
-      '<![CDATA[Testing CDATA with brackets: [This is in brackets] and <code>if (x > y) { doSomething(); }</code>]]>'
-    const expected =
-      'Testing CDATA with brackets: [This is in brackets] and <code>if (x > y) { doSomething(); }</code>'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #10', () => {
-    const value =
-      '&lt;script&gt;function test() { if (x &lt; y &amp;&amp; z &gt; 0) { alert(&quot;Hello!&quot;); } }&lt;/script&gt;'
-    const expected = '<script>function test() { if (x < y && z > 0) { alert("Hello!"); } }</script>'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle entities #11', () => {
-    const value =
-      '<![CDATA[<script>function test() { if (x < y && z > 0) { alert("Hello!"); } }</script>]]>'
-    const expected = '<script>function test() { if (x < y && z > 0) { alert("Hello!"); } }</script>'
-    expect(parseString(value)).toBe(expected)
-  })
-
-  it('Should handle empty string in CDATA', () => {
-    const value = '<![CDATA[        ]]>'
-    expect(parseString(value)).toBeUndefined()
-  })
-
-  it('Should trim string in CDATA', () => {
-    const value = '<![CDATA[    test    ]]>'
-    expect(parseString(value)).toBe('test')
-  })
-
-  it('should return number', () => {
+  it('should return number as string', () => {
     const value = 420
 
     expect(parseString(value)).toBe('420')
@@ -1009,7 +764,7 @@ describe('parseString', () => {
     expect(parseString(value)).toBeUndefined()
   })
 
-  it('should return boolean', () => {
+  it('should return undefined for boolean', () => {
     const value = true
 
     expect(parseString(value)).toBeUndefined()
@@ -1027,7 +782,6 @@ describe('parseString', () => {
     expect(parseString(value)).toBeUndefined()
   })
 })
-
 describe('parseNumber', () => {
   it('should handle array', () => {
     const value = ['javascript', { another: 'typescript' }]
@@ -1281,20 +1035,6 @@ describe('parseYesNoBoolean', () => {
 describe('parseDate', () => {
   it('should handle valid date strings', () => {
     const value = '2023-03-15T12:00:00Z'
-    const expected = '2023-03-15T12:00:00Z'
-
-    expect(parseDate(value)).toBe(expected)
-  })
-
-  it('should handle date strings with entities', () => {
-    const value = '2023-03-15T12:00:00&lt;test&gt;'
-    const expected = '2023-03-15T12:00:00<test>'
-
-    expect(parseDate(value)).toBe(expected)
-  })
-
-  it('should handle date strings wrapped in CDATA', () => {
-    const value = '<![CDATA[2023-03-15T12:00:00Z]]>'
     const expected = '2023-03-15T12:00:00Z'
 
     expect(parseDate(value)).toBe(expected)
@@ -1721,16 +1461,9 @@ describe('parseCsvOf', () => {
     expect(parseCsvOf(value, parseString)).toEqual(expected)
   })
 
-  it('should handle keywords with HTML entities', () => {
-    const value = 'podcast,tech &amp; programming,science'
+  it('should handle keywords with ampersand', () => {
+    const value = 'podcast,tech & programming,science'
     const expected = ['podcast', 'tech & programming', 'science']
-
-    expect(parseCsvOf(value, parseString)).toEqual(expected)
-  })
-
-  it('should handle keywords wrapped in CDATA', () => {
-    const value = '<![CDATA[podcast,technology,programming]]>'
-    const expected = ['podcast', 'technology', 'programming']
 
     expect(parseCsvOf(value, parseString)).toEqual(expected)
   })

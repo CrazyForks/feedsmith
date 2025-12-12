@@ -1,4 +1,3 @@
-import { decodeHTML, decodeXML } from 'entities'
 import type { XMLBuilder } from 'fast-xml-parser'
 import type {
   AnyOf,
@@ -144,71 +143,9 @@ export const generateSingularOrArray = <V>(
   }
 }
 
-const cdataStartTag = '<![CDATA['
-const cdataEndTag = ']]>'
-
-export const stripCdata = (text: Unreliable) => {
-  if (typeof text !== 'string') {
-    return text
-  }
-
-  let currentIndex = text.indexOf(cdataStartTag)
-
-  if (currentIndex === -1) {
-    return text
-  }
-
-  let result = ''
-  let lastIndex = 0
-
-  while (currentIndex !== -1) {
-    result += text.substring(lastIndex, currentIndex)
-    lastIndex = text.indexOf(cdataEndTag, currentIndex + 9)
-
-    if (lastIndex === -1) {
-      return text
-    }
-
-    result += text.substring(currentIndex + 9, lastIndex)
-    lastIndex += 3
-    currentIndex = text.indexOf(cdataStartTag, lastIndex)
-  }
-
-  result += text.substring(lastIndex)
-
-  return result
-}
-
-export const hasEntities = (text: string) => {
-  const ampIndex = text.indexOf('&')
-  return ampIndex !== -1 && text.indexOf(';', ampIndex) !== -1
-}
-
 export const parseString: ParseExactUtil<string> = (value) => {
   if (typeof value === 'string') {
-    if (value === '') {
-      return
-    }
-
-    let string = value
-
-    if (value.indexOf(cdataStartTag) !== -1) {
-      string = stripCdata(value)
-    }
-
-    string = string.trim()
-
-    if (string === '') {
-      return
-    }
-
-    if (hasEntities(string)) {
-      string = decodeXML(string)
-
-      if (hasEntities(string)) {
-        string = decodeHTML(string)
-      }
-    }
+    const string = value.trim()
 
     return string || undefined
   }

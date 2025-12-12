@@ -2,8 +2,8 @@ import type { X2jOptions, XmlBuilderOptions } from 'fast-xml-parser'
 
 export const parserConfig: X2jOptions = {
   trimValues: false,
-  processEntities: false,
-  htmlEntities: false,
+  processEntities: true,
+  htmlEntities: true,
   parseTagValue: false,
   parseAttributeValue: false,
   alwaysCreateTextNode: false,

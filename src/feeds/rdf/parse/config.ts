@@ -1,24 +1,9 @@
 import { XMLParser } from 'fast-xml-parser'
 import { parserConfig } from '../../../common/config.js'
 
-export const stopNodes = [
-  'rdf:rdf.channel.title',
-  'rdf:rdf.channel.link',
-  'rdf:rdf.channel.description',
-  'rdf:rdf.image.title',
-  'rdf:rdf.image.link',
-  'rdf:rdf.image.url',
-  'rdf:rdf.item.title',
-  'rdf:rdf.item.link',
-  'rdf:rdf.item.description',
-  'rdf:rdf.textinput.title',
-  'rdf:rdf.textinput.description',
-  'rdf:rdf.textinput.name',
-  'rdf:rdf.textinput.link',
-  // TODO: What about the namespaces?
-]
+// NOTE: stopNodes removed to use native fast-xml-parser entity/CDATA handling.
+// This is an experimental branch for performance comparison only.
 
 export const parser = new XMLParser({
   ...parserConfig,
-  stopNodes,
 })
